@@ -31,7 +31,7 @@ class DatasetCleaner():
 		# 	DatasetCleaner.remove_stopwords(DatasetCleaner.preprocess_text(x)))
 
 		df[df.columns[string_columns]] = df[df.columns[string_columns]].apply(lambda x: \
-			DatasetCleaner.remove_stopwords(DatasetCleaner.preprocess_text(x)))
+			DatasetCleaner.remove_stopwords(DatasetCleaner.preprocess(x)))
 
 		# Remove rows with empty values
 		df.replace('', np.nan, inplace=True)
@@ -43,7 +43,7 @@ class DatasetCleaner():
 		# Export to csv
 		pd.DataFrame.to_csv(df, output_filepath, index=False)
 	
-	def preprocess_series(series: pd.Series):
+	def preprocess(series: pd.Series):
 		"""Processes text in series to lowercase characters,
 		removes non-alpha characters,
 		removes multiple spaces, and
