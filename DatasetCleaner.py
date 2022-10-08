@@ -76,13 +76,10 @@ class DatasetCleaner():
 	# Tokenize and lemmatize the sentence
 	def lemmatize(series: pd.Series):
 		lemmatizer = nltk.stem.WordNetLemmatizer()
-		print("tagging")
 		tokens_list = [word_tokenize(row) for row in series]
 		word_pos_tags_list = nltk.pos_tag_sents(tokens_list) # Get position tags
-		print("lemma")
 		rows = [[lemmatizer.lemmatize(tag[0], DatasetCleaner.get_wordnet_pos(tag[1])) for idx, tag in enumerate(word_pos_tags)] for word_pos_tags in word_pos_tags_list] # Map the position tag and lemmatize the word/token
 		rows = [' '.join(row) for row in rows]
-		print("done")
 		return pd.Series(rows)
 	
 	# This is a helper function to map NTLK position tags
