@@ -26,9 +26,9 @@ class Classifier:
         X_train_vectors_tfidf = self.tfidf_vectorizer.fit_transform(X_train) 
 
         # FITTING THE CLASSIFICATION MODEL using Logistic Regression(tf-idf)
-        self.lr_tfidf = LogisticRegression(C=10, solver="saga")
+        self.lr_tfidf = LogisticRegression(max_iter=200)
         self.lr_tfidf.fit(X_train_vectors_tfidf, y_train)
-    
+
     def test(self, test_csv):
         # Load dataset
         df_test=pd.read_csv(test_csv)
