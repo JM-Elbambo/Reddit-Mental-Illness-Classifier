@@ -1,77 +1,176 @@
 import pandas as pd
 
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.model_selection import RandomizedSearchCV
+from sklearn.metrics import classification_report, confusion_matrix, f1_score
 
-from DatasetCleaner import DatasetCleaner
+import matplotlib.pyplot as plt
 
-class Classifier:
+# from DatasetCleaner import DatasetCleaner
 
-    def __init__(self, train_csv, X_column, y_column, labels):
-        # Remember column names and labels
-        self.column_X = X_column
-        self.column_y = y_column
-        self.labels = labels
+class Model:
+	def __init__(self, X_column: list, y_column, labels):
+		# Remember column names and labels
+		self.X_column = X_column
+		self.y_column = y_column
+		self.labels = labels
 
-        # Load dataset
-        df_train= pd.read_csv(train_csv)
+		# Initialize TF-IDF vectorizer
+		self.tfidf_vectorizer = TfidfVectorizer(max_features=1000)
 
-        # Get X and y
-        X_train = df_train[self.column_X]
-        y_train = df_train[self.column_y]
+		# Initialize classifer
+		self.classifier = RandomForestClassifier(random_state=0, n_estimators=50, max_depth=22, min_samples_split=50, min_samples_leaf=20, max_features='sqrt', max_leaf_nodes=30, max_samples=0.4)
 
-        # Apply Tf-Idf
-        self.tfidf_vectorizer = TfidfVectorizer(use_idf=True)
-        X_train_vectors_tfidf = self.tfidf_vectorizer.fit_transform(X_train) 
+	def extract_features(self, X_columns: pd.DataFrame, train=False):
+		print("Extracting features...")
 
-        # FITTING THE CLASSIFICATION MODEL using Logistic Regression(tf-idf)
-        self.lr_tfidf = LogisticRegression(max_iter=200)
-        self.lr_tfidf.fit(X_train_vectors_tfidf, y_train)
+		# Feature engineering
+		# Extract features for each column in X
+		df_features = pd.DataFrame()
+		for column_name in X_columns.columns.values:
+			df_features[f"{column_name}_char_count"] = X_columns[column_name].apply(lambda x: Model.get_char_count(x))
+			df_features[f"{column_name}_word_count"] = X_columns[column_name].apply(lambda x: Model.get_word_count(x))
+			df_features[f"{column_name}_average_word_length"] = df_features[f"{column_name}_char_count"] / df_features[f"{column_name}_word_count"]
+			df_features[f"{column_name}_unique_word_count"] = X_columns[column_name].apply(lambda x: Model.get_unique_word_count(x))
+			df_features[f"{column_name}_unique_word_ratio"] = df_features[f"{column_name}_unique_word_count"] / df_features[f"{column_name}_word_count"]
 
-    def test(self, test_csv):
-        # Load dataset
-        df_test=pd.read_csv(test_csv)
+		# Apply Tf-Idf
+		print("Applying Tf-Idf...")
+		if train:
+			# Fit the vectorizer
+			for column_name in X_columns.columns.values:
+				self.tfidf_vectorizer = self.tfidf_vectorizer.fit(X_columns[column_name])
+		# Transform the vectorizer
+		df_tfidf = pd.DataFrame()
+		for column_name in X_columns.columns.values:
+			tfidf_i = self.tfidf_vectorizer.transform(X_columns[column_name]).toarray()
+			df_tfidf_i = pd.DataFrame(tfidf_i)
+			df_tfidf = pd.concat([df_tfidf, df_tfidf_i], axis=1)
 
-        # Get X and y
-        X_test = df_test[self.column_X]
-        y_test = df_test[self.column_y]
+		# Merge all features
+		X_vectors = pd.concat([df_tfidf, df_features], axis=1)
+		return X_vectors
 
-        # Apply Tf-Idf
-        X_test_vectors_tfidf = self.tfidf_vectorizer.transform(X_test)
+	def train(self, train_csv):
+		# Load dataset
+		df_train = pd.read_csv(train_csv)
 
-        # Predict y value for test dataset
-        y_predict = self.lr_tfidf.predict(X_test_vectors_tfidf)
-        return y_test, y_predict
+		# Get X and y
+		X_train = self.extract_features(df_train[self.X_column], True)
+		y_train = df_train[self.y_column]
+
+		# Fit classifier
+		self.classifier.fit(X_train, y_train)
+
+	def test(self, test_csv):
+		# Load dataset
+		def_test = pd.read_csv(test_csv)
+
+		# Get X and y
+		X_test = self.extract_features(def_test[self.X_column])
+		y_test = def_test[self.y_column]
+
+		# Classify X_test
+		y_predict = self.classifier.predict(X_test)
+
+		print("CLASSIFICATION REPORT")
+		print(classification_report(y_test, y_predict, target_names=self.labels))
+
+		print("CONFUSION MATRIX")
+		print(confusion_matrix(y_test, y_predict))
+
+	def hyperparameter_tuning_report(self):
+		# Create the random grid
+		n_estimators = [5, 10, 20, 40] #[10, 20, 40, 80]
+		max_features = ['log2', 'sqrt'] #[10, 20, 40, 80]
+		max_depth = [5, 10, 20, 40]
+		min_samples_split = [10, 20, 40, 80]
+		min_samples_leaf = [5, 10, 20, 40]
+		bootstrap = [True, False]
+		random_grid = {'n_estimators': n_estimators,
+					'max_features': max_features,
+					'max_depth': max_depth,
+					'min_samples_split': min_samples_split,
+					'min_samples_leaf': min_samples_leaf,
+					'bootstrap': bootstrap}
+
+		# Use the random grid to search for best hyperparameters
+		rf_random = RandomizedSearchCV(estimator=self.classifier, param_distributions=random_grid, cv=3, verbose=2, random_state=0, n_jobs=-1)
+		rf_random.fit(self.X_vectors, self.y_train)
+		print(rf_random.best_params_) # last result: {'n_estimators': 40, 'min_samples_split': 20, 'min_samples_leaf': 20, 'max_features': 'sqrt', 'max_depth': 20, 'bootstrap': True}
+
+	def graph_hyperparameter_tuning(self, test_csv):
+		# Load dataset
+		def_test = pd.read_csv(test_csv)
+
+		# Get X and y
+		X_test = None
+		y_test = None
+
+		# values = list(range(10,101,10))
+		values = [x*0.01 for x in range(10,101,10)]
+		scores = list()
+		values_length = len(values)
+		for i in range(values_length):
+			print(f"Testing {i+1}/{values_length} parameter setting..")
+			value = values[i]
+			new_classifier = self.classifier
+			new_classifier.max_samples = value
+			self.train(path_processed_training)
+			if i == 0:
+				X_test = self.extract_features(def_test[self.X_column])
+				y_test = def_test[self.y_column]
+			y_predict = new_classifier.predict(X_test)
+			scores.append(f1_score(y_test, y_predict, average="micro"))
+
+		# Graph results
+		plt.plot(values, scores, ".-")
+		plt.xlabel("Parameter")
+		plt.ylabel("F1 Score")
+		plt.grid()
+		plt.show()
+		print(scores)
+
+	# region Feature extraction methods
+
+	def get_char_count(text):
+		return len(text)
+
+	def get_word_count(text: str):
+		return len(text.split())
+
+	def get_unique_word_count(text: str):
+		return len(set(text.split()))
+
+	# endregion
 
 if __name__ == "__main__":
-    # File paths
-    path_raw_training = r"Data Sets\Raw\Training Set.csv"
-    path_raw_test = r"Data Sets\Raw\Test Set.csv"
-    path_processed_training = r"Data Sets\Processed\Training Set.csv"
-    path_processed_test = r"Data Sets\Processed\Test Set.csv"
+	# File paths
+	path_raw_training = r"Data Sets\Raw\Training Set.csv"
+	path_raw_test = r"Data Sets\Raw\Test Set.csv"
+	path_processed_training = r"Data Sets\Processed\Training Set.csv"
+	path_processed_test = r"Data Sets\Processed\Test Set.csv"
 
-    # Data cleaning
-    # print("\n============================================================\n")
-    # print("Cleaning:", path_raw_training)
-    # DatasetCleaner.clean_csv(path_raw_training, path_processed_training, ['title', 'post', 'class_id'])
-    # print("Cleaning:", path_raw_test)
-    # DatasetCleaner.clean_csv(path_raw_test, path_processed_test, ['title', 'post', 'class_id'])
+	# Data cleaning
+	# print("\n============================================================\n")
+	# print("Cleaning:", path_raw_training)
+	# DatasetCleaner.clean_csv(path_raw_training, path_processed_training, ['title', 'post', 'class_id'])
+	# print("Cleaning:", path_raw_test)
+	# DatasetCleaner.clean_csv(path_raw_test, path_processed_test, ['title', 'post', 'class_id'])
 
-    print("\n============================================================\n")
-    # Train our model
-    print("Training model...")
-    # model = Classifier(path_processed_training, "title", "class_id", ("ADHD", "Anxiety", "Bipolar", "Depression", "PTSD", "None"))
-    model = Classifier(path_processed_training, "post", "class_id", ("ADHD", "Anxiety", "Bipolar", "Depression", "PTSD", "None"))
+	# Train model
+	print("\n============================================================\n")
+	print("TRAINING PHASE")
+	model = Model(["title", "post"], "class_id", ["ADHD", "Anxiety", "Bipolar", "Depression", "PTSD", "None"])
+	model.train(path_processed_training)
 
-    # Test our model
-    print("Testing model...")
-    y_test, y_predict = model.test(path_processed_test)
+	# print("\n============================================================\n")
+	# print("HYPERPARAMETER TUNING")
+	# model.hyperparameter_tuning_report()
+	# model.graph_hyperparameter_tuning(path_processed_test)
 
-    print("\n============================================================\n")
-    print("CLASSIFICATION REPORT\n")
-    print(classification_report(y_test, y_predict, target_names=model.labels))
-
-    print("\n============================================================\n")
-    print("CONFUSION MATRIX\n")
-    print(confusion_matrix(y_test, y_predict))
+	# Test model
+	print("\n============================================================\n")
+	print("TESTING PHASE")
+	model.test(path_processed_test)
