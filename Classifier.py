@@ -20,7 +20,7 @@ class Model:
 		self.tfidf_vectorizer = TfidfVectorizer(max_features=1000)
 
 		# Initialize classifer
-		self.classifier = RandomForestClassifier(random_state=0, n_estimators=50, max_depth=22, min_samples_split=50, min_samples_leaf=20, max_features='sqrt', max_leaf_nodes=30, max_samples=0.4)
+		self.classifier = RandomForestClassifier(random_state=0, n_estimators=30, max_depth=20, min_samples_split=50, min_samples_leaf=10, max_features='sqrt', max_leaf_nodes=100, max_samples=0.4)
 
 	def extract_features(self, X_columns: pd.DataFrame, train=False):
 		print("Extracting features...")
@@ -65,11 +65,11 @@ class Model:
 
 	def test(self, test_csv):
 		# Load dataset
-		def_test = pd.read_csv(test_csv)
+		df_test = pd.read_csv(test_csv)
 
 		# Get X and y
-		X_test = self.extract_features(def_test[self.X_column])
-		y_test = def_test[self.y_column]
+		X_test = self.extract_features(df_test[self.X_column])
+		y_test = df_test[self.y_column]
 
 		# Classify X_test
 		y_predict = self.classifier.predict(X_test)
@@ -100,37 +100,50 @@ class Model:
 		rf_random.fit(self.X_vectors, self.y_train)
 		print(rf_random.best_params_) # last result: {'n_estimators': 40, 'min_samples_split': 20, 'min_samples_leaf': 20, 'max_features': 'sqrt', 'max_depth': 20, 'bootstrap': True}
 
-	def graph_hyperparameter_tuning(self, test_csv):
+	def graph_hyperparameter_tuning(self, train_csv, test_csv):
 		# Load dataset
-		def_test = pd.read_csv(test_csv)
+		df_train = pd.read_csv(train_csv)
+		df_test = pd.read_csv(test_csv)
 
 		# Get X and y
-		X_test = None
-		y_test = None
+		X_train = self.extract_features(df_train[self.X_column], True)
+		y_train = df_train[self.y_column]
+		del df_train
+		X_test = self.extract_features(df_test[self.X_column])
+		y_test = df_test[self.y_column]
+		del df_test
 
-		# values = list(range(10,101,10))
-		values = [x*0.01 for x in range(10,101,10)]
-		scores = list()
+		original_classifier = self.classifier
+
+		values = list(range(10,201,10))
+		# values = list(range(2,21,2))
+		# values = [x*0.01 for x in range(10,101,10)]
+		train_scores = list()
+		test_scores = list()
 		values_length = len(values)
+
 		for i in range(values_length):
 			print(f"Testing {i+1}/{values_length} parameter setting..")
 			value = values[i]
-			new_classifier = self.classifier
-			new_classifier.max_samples = value
-			self.train(path_processed_training)
-			if i == 0:
-				X_test = self.extract_features(def_test[self.X_column])
-				y_test = def_test[self.y_column]
-			y_predict = new_classifier.predict(X_test)
-			scores.append(f1_score(y_test, y_predict, average="micro"))
+			new_classifier = original_classifier
+			new_classifier.n_estimators = value
+			new_classifier.fit(X_train, y_train)
+			y_train_predict = new_classifier.predict(X_train)
+			train_scores.append(f1_score(y_train, y_train_predict, average="macro"))
+			del y_train_predict
+			y_test_predict = new_classifier.predict(X_test)
+			test_scores.append(f1_score(y_test, y_test_predict, average="macro"))
+			del y_test_predict
+			del new_classifier
 
 		# Graph results
-		plt.plot(values, scores, ".-")
-		plt.xlabel("Parameter")
+		plt.plot(values, train_scores, ".-", label="Train")
+		plt.plot(values, test_scores, ".-", label="Test")
+		plt.xlabel("Hyperparameter Value")
 		plt.ylabel("F1 Score")
+		plt.legend()
 		plt.grid()
 		plt.show()
-		print(scores)
 
 	# region Feature extraction methods
 
@@ -168,7 +181,7 @@ if __name__ == "__main__":
 	# print("\n============================================================\n")
 	# print("HYPERPARAMETER TUNING")
 	# model.hyperparameter_tuning_report()
-	# model.graph_hyperparameter_tuning(path_processed_test)
+	# model.graph_hyperparameter_tuning(path_processed_training, path_processed_test)
 
 	# Test model
 	print("\n============================================================\n")
