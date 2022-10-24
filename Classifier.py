@@ -20,7 +20,7 @@ class Model:
 		self.tfidf_vectorizer = TfidfVectorizer(max_features=1000)
 
 		# Initialize classifer
-		self.classifier = RandomForestClassifier(random_state=0, n_estimators=30, max_depth=20, min_samples_split=50, min_samples_leaf=10, max_features='sqrt', max_leaf_nodes=100, max_samples=0.4)
+		self.classifier = RandomForestClassifier(random_state=0, n_estimators=70, max_depth=40, min_samples_split=40, min_samples_leaf=10, max_features='sqrt', max_leaf_nodes=70, max_samples=0.4)
 
 	def extract_features(self, X_columns: pd.DataFrame, train=False):
 		print("Extracting features...")
