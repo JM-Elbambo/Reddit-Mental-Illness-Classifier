@@ -50,6 +50,11 @@ class Model:
 
 		# Merge all features
 		X_vectors = pd.concat([df_tfidf, df_features], axis=1)
+		
+		# Convert all feature names to string
+		# To suppress deprecation warning
+		X_vectors.columns = X_vectors.columns.astype(str)
+
 		return X_vectors
 
 	def train(self, train_csv):
