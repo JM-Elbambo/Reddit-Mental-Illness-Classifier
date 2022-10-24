@@ -2,7 +2,7 @@ import pandas as pd
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.model_selection import RandomizedSearchCV
+from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import classification_report, confusion_matrix, f1_score
 
 import matplotlib.pyplot as plt
@@ -80,25 +80,30 @@ class Model:
 		print("CONFUSION MATRIX")
 		print(confusion_matrix(y_test, y_predict))
 
-	def hyperparameter_tuning_report(self):
-		# Create the random grid
-		n_estimators = [5, 10, 20, 40] #[10, 20, 40, 80]
-		max_features = ['log2', 'sqrt'] #[10, 20, 40, 80]
-		max_depth = [5, 10, 20, 40]
-		min_samples_split = [10, 20, 40, 80]
-		min_samples_leaf = [5, 10, 20, 40]
-		bootstrap = [True, False]
-		random_grid = {'n_estimators': n_estimators,
-					'max_features': max_features,
+	def perform_grid_search(self, train_csv):
+		# Load dataset
+		df_train = pd.read_csv(train_csv)
+
+		# Get X and y
+		X_train = self.extract_features(df_train[self.X_column], True)
+		y_train = df_train[self.y_column]
+
+		# Create the grid
+		n_estimators = [10, 40, 70]
+		max_depth = [10, 40, 70]
+		min_samples_split = [10, 40, 70]
+		min_samples_leaf = [10, 40, 70]
+		max_leaf_nodes = [10, 40, 70]
+		grid = {'n_estimators': n_estimators,
 					'max_depth': max_depth,
 					'min_samples_split': min_samples_split,
 					'min_samples_leaf': min_samples_leaf,
-					'bootstrap': bootstrap}
+					'max_leaf_nodes': max_leaf_nodes}
 
 		# Use the random grid to search for best hyperparameters
-		rf_random = RandomizedSearchCV(estimator=self.classifier, param_distributions=random_grid, cv=3, verbose=2, random_state=0, n_jobs=-1)
-		rf_random.fit(self.X_vectors, self.y_train)
-		print(rf_random.best_params_) # last result: {'n_estimators': 40, 'min_samples_split': 20, 'min_samples_leaf': 20, 'max_features': 'sqrt', 'max_depth': 20, 'bootstrap': True}
+		rf_random = GridSearchCV(self.classifier, grid, cv=3, verbose=2, n_jobs=-1)
+		rf_random.fit(X_train, y_train)
+		print(rf_random.best_params_) # last result: {'max_depth': 40, 'max_leaf_nodes': 70, 'min_samples_leaf': 10, 'min_samples_split': 40, 'n_estimators': 70}
 
 	def graph_hyperparameter_tuning(self, train_csv, test_csv):
 		# Load dataset
@@ -180,7 +185,7 @@ if __name__ == "__main__":
 
 	# print("\n============================================================\n")
 	# print("HYPERPARAMETER TUNING")
-	# model.hyperparameter_tuning_report()
+	# model.hyperparameter_tuning_report(path_processed_training)
 	# model.graph_hyperparameter_tuning(path_processed_training, path_processed_test)
 
 	# Test model
