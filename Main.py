@@ -25,8 +25,8 @@ if __name__ == "__main__":
 	print("HYPERPARAMETER TUNING")
 	train_grid_search = model.perform_grid_search(path_processed_training)
 	test_grid_search = model.perform_grid_search(path_processed_test)
-	print("Train: " + train_grid_search)
-	print("Test: " + test_grid_search)
+	print("Train: " + str(train_grid_search))
+	print("Test: " + str(test_grid_search))
 	# model.graph_hyperparameter_tuning(path_processed_training, path_processed_test)
 
 	# # Test model
