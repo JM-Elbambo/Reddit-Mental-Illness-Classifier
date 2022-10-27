@@ -1,13 +1,12 @@
+import re
+import matplotlib.pyplot as plt
 import pandas as pd
-
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import classification_report, confusion_matrix, f1_score
 
-import matplotlib.pyplot as plt
-
-# from DatasetCleaner import DatasetCleaner
+from DatasetCleaner import DatasetCleaner
 
 class Model:
 	def __init__(self, X_column: list, y_column, labels):
@@ -21,41 +20,6 @@ class Model:
 
 		# Initialize classifer
 		self.classifier = RandomForestClassifier(random_state=0, n_estimators=70, max_depth=40, min_samples_split=40, min_samples_leaf=10, max_features='sqrt', max_leaf_nodes=70, max_samples=0.4)
-
-	def extract_features(self, X_columns: pd.DataFrame, train=False):
-		print("Extracting features...")
-
-		# Feature engineering
-		# Extract features for each column in X
-		df_features = pd.DataFrame()
-		for column_name in X_columns.columns.values:
-			df_features[f"{column_name}_char_count"] = X_columns[column_name].apply(lambda x: Model.get_char_count(x))
-			df_features[f"{column_name}_word_count"] = X_columns[column_name].apply(lambda x: Model.get_word_count(x))
-			df_features[f"{column_name}_average_word_length"] = df_features[f"{column_name}_char_count"] / df_features[f"{column_name}_word_count"]
-			df_features[f"{column_name}_unique_word_count"] = X_columns[column_name].apply(lambda x: Model.get_unique_word_count(x))
-			df_features[f"{column_name}_unique_word_ratio"] = df_features[f"{column_name}_unique_word_count"] / df_features[f"{column_name}_word_count"]
-
-		# Apply Tf-Idf
-		print("Applying Tf-Idf...")
-		if train:
-			# Fit the vectorizer
-			for column_name in X_columns.columns.values:
-				self.tfidf_vectorizer = self.tfidf_vectorizer.fit(X_columns[column_name])
-		# Transform the vectorizer
-		df_tfidf = pd.DataFrame()
-		for column_name in X_columns.columns.values:
-			tfidf_i = self.tfidf_vectorizer.transform(X_columns[column_name]).toarray()
-			df_tfidf_i = pd.DataFrame(tfidf_i)
-			df_tfidf = pd.concat([df_tfidf, df_tfidf_i], axis=1)
-
-		# Merge all features
-		X_vectors = pd.concat([df_tfidf, df_features], axis=1)
-		
-		# Convert all feature names to string
-		# To suppress deprecation warning
-		X_vectors.columns = X_vectors.columns.astype(str)
-
-		return X_vectors
 
 	def train(self, train_csv):
 		# Load dataset
@@ -157,6 +121,52 @@ class Model:
 
 	# region Feature extraction methods
 
+	def extract_features(self, X_columns: pd.DataFrame, train=False):
+		print("Extracting features...")
+
+		# Feature engineering
+		# Extract features for each column in X
+		df_features = pd.DataFrame()
+		for column_name in X_columns.columns.values:
+			df_features[f"{column_name}_char_count"] = X_columns[column_name].apply(lambda x: Model.get_char_count(x))
+			df_features[f"{column_name}_word_count"] = X_columns[column_name].apply(lambda x: Model.get_word_count(x))
+			df_features[f"{column_name}_sentence_count"] = X_columns[column_name].apply(lambda x: Model.get_sentence_count(x))
+
+			df_features[f"{column_name}_unique_word_count"] = X_columns[column_name].apply(lambda x: Model.get_unique_word_count(x))
+			df_features[f"{column_name}_syllable_count"] = X_columns[column_name].apply(lambda x: Model.get_syllable_count(x))
+
+			df_features[f"{column_name}_average_char_per_word"] = df_features[f"{column_name}_char_count"] / df_features[f"{column_name}_word_count"]
+			df_features[f"{column_name}_average_char_per_sentence"] = df_features[f"{column_name}_char_count"] / df_features[f"{column_name}_sentence_count"]
+			df_features[f"{column_name}_average_word_per_sentence"] = df_features[f"{column_name}_word_count"] / df_features[f"{column_name}_sentence_count"]
+
+			df_features[f"{column_name}_average_syllable_per_word"] = df_features[f"{column_name}_syllable_count"] / df_features[f"{column_name}_word_count"]
+			df_features[f"{column_name}_average_syllable_sentence"] = df_features[f"{column_name}_syllable_count"] / df_features[f"{column_name}_sentence_count"]
+
+			df_features[f"{column_name}_average_unique_word_per_word"] = df_features[f"{column_name}_unique_word_count"] / df_features[f"{column_name}_word_count"]
+			df_features[f"{column_name}_average_unique_word_per_sentence"] = df_features[f"{column_name}_unique_word_count"] / df_features[f"{column_name}_sentence_count"]
+
+		# Apply Tf-Idf
+		print("Applying Tf-Idf...")
+		if train:
+			# Fit the vectorizer
+			for column_name in X_columns.columns.values:
+				self.tfidf_vectorizer = self.tfidf_vectorizer.fit(X_columns[column_name])
+		# Transform the vectorizer
+		df_tfidf = pd.DataFrame()
+		for column_name in X_columns.columns.values:
+			tfidf_i = self.tfidf_vectorizer.transform(X_columns[column_name]).toarray()
+			df_tfidf_i = pd.DataFrame(tfidf_i)
+			df_tfidf = pd.concat([df_tfidf, df_tfidf_i], axis=1)
+
+		# Merge all features
+		X_vectors = pd.concat([df_tfidf, df_features], axis=1)
+		
+		# Convert all feature names to string
+		# To suppress deprecation warning
+		X_vectors.columns = X_vectors.columns.astype(str)
+
+		return X_vectors
+
 	def get_char_count(text):
 		return len(text)
 
@@ -165,35 +175,14 @@ class Model:
 
 	def get_unique_word_count(text: str):
 		return len(set(text.split()))
+	
+	def get_sentence_count(text: str):
+		return len(text.split(DatasetCleaner.SENTENCE_SEPARATOR))
 
+	def get_syllable_count(word:str):
+		return len(
+			re.findall('(?!e$)[aeiouy]+', word, re.I) +
+			re.findall('^[^aeiouy]*e$', word, re.I)
+		)
+	
 	# endregion
-
-if __name__ == "__main__":
-	# File paths
-	path_raw_training = r"Data Sets\Raw\Training Set.csv"
-	path_raw_test = r"Data Sets\Raw\Test Set.csv"
-	path_processed_training = r"Data Sets\Processed\Training Set.csv"
-	path_processed_test = r"Data Sets\Processed\Test Set.csv"
-
-	# Data cleaning
-	# print("\n============================================================\n")
-	# print("Cleaning:", path_raw_training)
-	# DatasetCleaner.clean_csv(path_raw_training, path_processed_training, ['title', 'post', 'class_id'])
-	# print("Cleaning:", path_raw_test)
-	# DatasetCleaner.clean_csv(path_raw_test, path_processed_test, ['title', 'post', 'class_id'])
-
-	# Train model
-	print("\n============================================================\n")
-	print("TRAINING PHASE")
-	model = Model(["title", "post"], "class_id", ["ADHD", "Anxiety", "Bipolar", "Depression", "PTSD", "None"])
-	model.train(path_processed_training)
-
-	# print("\n============================================================\n")
-	# print("HYPERPARAMETER TUNING")
-	# model.hyperparameter_tuning_report(path_processed_training)
-	# model.graph_hyperparameter_tuning(path_processed_training, path_processed_test)
-
-	# Test model
-	print("\n============================================================\n")
-	print("TESTING PHASE")
-	model.test(path_processed_test)
