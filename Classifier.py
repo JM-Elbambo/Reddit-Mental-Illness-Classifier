@@ -49,20 +49,20 @@ class Model:
 		print("CONFUSION MATRIX")
 		print(confusion_matrix(y_test, y_predict))
 
-	def perform_grid_search(self, train_csv):
+	def perform_grid_search(self, csv):
 		# Load dataset
-		df_train = pd.read_csv(train_csv)
+		df_train = pd.read_csv(csv)
 
 		# Get X and y
 		X_train = self.extract_features(df_train[self.X_column], True)
 		y_train = df_train[self.y_column]
 
 		# Create the grid
-		n_estimators = [10, 40, 70]
-		max_depth = [10, 40, 70]
-		min_samples_split = [10, 40, 70]
-		min_samples_leaf = [10, 40, 70]
-		max_leaf_nodes = [10, 40, 70]
+		n_estimators = [50, 100, 150]
+		max_depth = [50, 100, 150]
+		min_samples_split = [50, 100, 150]
+		min_samples_leaf = [50, 100, 150]
+		max_leaf_nodes = [50, 100, 150]
 		grid = {'n_estimators': n_estimators,
 					'max_depth': max_depth,
 					'min_samples_split': min_samples_split,
@@ -72,7 +72,7 @@ class Model:
 		# Use the random grid to search for best hyperparameters
 		rf_random = GridSearchCV(self.classifier, grid, cv=3, verbose=2, n_jobs=-1)
 		rf_random.fit(X_train, y_train)
-		print(rf_random.best_params_) # last result: {'max_depth': 40, 'max_leaf_nodes': 70, 'min_samples_leaf': 10, 'min_samples_split': 40, 'n_estimators': 70}
+		return rf_random.best_params_ # last result: {'max_depth': 40, 'max_leaf_nodes': 70, 'min_samples_leaf': 10, 'min_samples_split': 40, 'n_estimators': 70}
 
 	def graph_hyperparameter_tuning(self, train_csv, test_csv):
 		# Load dataset
