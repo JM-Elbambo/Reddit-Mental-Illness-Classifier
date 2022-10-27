@@ -5,8 +5,10 @@ import numpy as np
 
 import nltk
 from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
+import nltk.tokenize
 from nltk.corpus import wordnet
+
+from nltk import tokenize
 
 class DatasetCleaner():
 	# Download nltk dependencies
@@ -15,6 +17,7 @@ class DatasetCleaner():
 	nltk.download('omw-1.4')
 	nltk.download('punkt')
 	nltk.download('averaged_perceptron_tagger')
+	SENTENCE_SEPARATOR = '|'
 
 	# Define stopwords
 	STOPWORDS_LIST = stopwords.words('english')
@@ -37,7 +40,7 @@ class DatasetCleaner():
 		string_columns = (df.applymap(type) == str).all(0)
 
 		# Clean string columns
-		df[df.columns[string_columns]] = df[df.columns[string_columns]].apply(lambda x: DatasetCleaner.clean_series(x))
+		df[df.columns[string_columns]] = df[df.columns[string_columns]].apply(lambda series: DatasetCleaner.preprocess_series(series))
 
 		# Remove rows with empty values
 		df.replace('', np.nan, inplace=True)
@@ -49,61 +52,22 @@ class DatasetCleaner():
 		# Export to csv
 		pd.DataFrame.to_csv(df, output_filepath, index=False)
 	
-	def clean_series(series: pd.Series):
-		series = DatasetCleaner.preprocess(series)
-		series = DatasetCleaner.lemmatize(series)
-		series = DatasetCleaner.remove_stopwords(series)
-		return series
-
-	def preprocess(series: pd.Series):
-		"""Processes text in series to lowercase characters,
-		removes non-alpha characters,
-		removes multiple spaces, and
-		removes leading and trailing whitespaces
-
-		Args:
-			series (pandas.Series): series to process
-
-		Returns:
-			pandas.Series: processed series
-		"""
-		series = series.str.lower()
-		series = series.str.replace("[^a-z ]", ' ', regex=True)
-		series = series.str.replace(" +", ' ', regex=True)
-		series = series.str.strip()
+	def preprocess_series(series: pd.Series):
+		series = series.apply(lambda text: DatasetCleaner.preprocess_text(text))
 		return series
 	
-	# Tokenize and lemmatize the sentence
-	def lemmatize(series: pd.Series):
-		lemmatizer = nltk.stem.WordNetLemmatizer()
-		tokens_list = [word_tokenize(row) for row in series]
-		word_pos_tags_list = nltk.pos_tag_sents(tokens_list) # Get position tags
-		rows = [[lemmatizer.lemmatize(tag[0], DatasetCleaner.get_wordnet_pos(tag[1])) for idx, tag in enumerate(word_pos_tags)] for word_pos_tags in word_pos_tags_list] # Map the position tag and lemmatize the word/token
-		rows = [' '.join(row) for row in rows]
-		return pd.Series(rows)
-	
-	# This is a helper function to map NTLK position tags
-	def get_wordnet_pos(tag):
-		if tag.startswith('J'):
-			return wordnet.ADJ
-		elif tag.startswith('V'):
-			return wordnet.VERB
-		elif tag.startswith('N'):
-			return wordnet.NOUN
-		elif tag.startswith('R'):
-			return wordnet.ADV
-		else:
-			return wordnet.NOUN
+	def preprocess_text(text: str):
+		# Split the text by sentences
+		sentences = tokenize.sent_tokenize(text)
 
-	def remove_stopwords(series: pd.Series):
-		"""Removes stopwords from text in series
-
-		Args:
-			series (pandas.Series): series to process
-
-		Returns:
-			pandas.Series: processed series without stopwords
-		"""
-		rows = [[word for word in row if word not in DatasetCleaner.STOPWORDS_LIST] for row in series.str.split()]
-		rows = [' '.join(row) for row in rows]
-		return pd.Series(rows)
+		# Clean each sentence and remove stopwords
+		for i in range(len(sentences)):
+			sentence = sentences[i].lower()
+			sentence = re.sub("[^a-z]+", ' ', sentence)
+			sentence = ' '.join([word for word in sentence.split() if word not in DatasetCleaner.STOPWORDS_LIST])
+			sentences[i] = sentence
+		
+		# Combine each sentence by the separator
+		preprocessed_text = DatasetCleaner.SENTENCE_SEPARATOR.join(sentences)
+		preprocessed_text = preprocessed_text.strip()
+		return preprocessed_text
