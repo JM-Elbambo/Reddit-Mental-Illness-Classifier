@@ -175,7 +175,7 @@ class Model:
 	def get_word_count(text: str):
 		# Separate words between sentence separator
 		text = text.replace(DatasetCleaner.SENTENCE_SEPARATOR, ' ')
-		return len(text).split()
+		return len(text.split())
 
 	def get_unique_word_count(text: str):
 		# Separate words between sentence separator
