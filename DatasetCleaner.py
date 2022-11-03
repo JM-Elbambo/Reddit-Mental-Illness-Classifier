@@ -66,7 +66,8 @@ class DatasetCleaner():
 			sentence = sentences[i].lower()
 			sentence = re.sub("[^a-z]+", ' ', sentence)
 			sentence = ' '.join([word for word in sentence.split() if word not in DatasetCleaner.STOPWORDS_LIST])
-			cleaned_sentences.append(sentence)
+			if len(sentence) > 0:
+				cleaned_sentences.append(sentence)
 		
 		# Combine each sentence by the separator
 		preprocessed_text = DatasetCleaner.SENTENCE_SEPARATOR.join(cleaned_sentences)
