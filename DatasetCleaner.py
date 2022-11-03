@@ -61,13 +61,14 @@ class DatasetCleaner():
 		sentences = tokenize.sent_tokenize(text)
 
 		# Clean each sentence and remove stopwords
+		cleaned_sentences = list()
 		for i in range(len(sentences)):
 			sentence = sentences[i].lower()
 			sentence = re.sub("[^a-z]+", ' ', sentence)
 			sentence = ' '.join([word for word in sentence.split() if word not in DatasetCleaner.STOPWORDS_LIST])
-			sentences[i] = sentence
+			cleaned_sentences.append(sentence)
 		
 		# Combine each sentence by the separator
-		preprocessed_text = DatasetCleaner.SENTENCE_SEPARATOR.join(sentences)
+		preprocessed_text = DatasetCleaner.SENTENCE_SEPARATOR.join(cleaned_sentences)
 		preprocessed_text = preprocessed_text.strip()
 		return preprocessed_text
