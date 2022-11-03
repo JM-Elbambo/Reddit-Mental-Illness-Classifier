@@ -167,13 +167,19 @@ class Model:
 
 		return X_vectors
 
-	def get_char_count(text):
+	def get_char_count(text: str):
+		# Exclude whitespace and sentence separator
+		text = text.replace(' ', '').replace(DatasetCleaner.SENTENCE_SEPARATOR, '')
 		return len(text)
 
 	def get_word_count(text: str):
-		return len(text.split())
+		# Separate words between sentence separator
+		text = text.replace(DatasetCleaner.SENTENCE_SEPARATOR, ' ')
+		return len(text).split()
 
 	def get_unique_word_count(text: str):
+		# Separate words between sentence separator
+		text = text.replace(DatasetCleaner.SENTENCE_SEPARATOR, ' ')
 		return len(set(text.split()))
 	
 	def get_sentence_count(text: str):
