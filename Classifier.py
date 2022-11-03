@@ -74,18 +74,18 @@ class Model:
 		rf_random.fit(X_train, y_train)
 		return rf_random.best_params_ # last result: {'max_depth': 40, 'max_leaf_nodes': 70, 'min_samples_leaf': 10, 'min_samples_split': 40, 'n_estimators': 70}
 
-	def graph_hyperparameter_tuning(self, train_csv, test_csv):
+	def graph_hyperparameter_tuning(self, train_csv, validation_csv):
 		# Load dataset
 		df_train = pd.read_csv(train_csv)
-		df_test = pd.read_csv(test_csv)
+		df_validation = pd.read_csv(validation_csv)
 
 		# Get X and y
 		X_train = self.extract_features(df_train[self.X_column], True)
 		y_train = df_train[self.y_column]
 		del df_train
-		X_test = self.extract_features(df_test[self.X_column])
-		y_test = df_test[self.y_column]
-		del df_test
+		X_test = self.extract_features(df_validation[self.X_column])
+		y_validation = df_validation[self.y_column]
+		del df_validation
 
 		original_classifier = self.classifier
 
@@ -106,7 +106,7 @@ class Model:
 			train_scores.append(f1_score(y_train, y_train_predict, average="macro"))
 			del y_train_predict
 			y_test_predict = new_classifier.predict(X_test)
-			test_scores.append(f1_score(y_test, y_test_predict, average="macro"))
+			test_scores.append(f1_score(y_validation, y_test_predict, average="macro"))
 			del y_test_predict
 			del new_classifier
 
