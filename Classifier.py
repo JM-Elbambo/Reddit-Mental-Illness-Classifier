@@ -1,6 +1,6 @@
 import re
-import matplotlib.pyplot as plt
 import pandas as pd
+from sklearn.base import clone
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import GridSearchCV
@@ -19,7 +19,7 @@ class Model:
 		self.tfidf_vectorizer = TfidfVectorizer(max_features=1000)
 
 		# Initialize classifer
-		self.classifier = RandomForestClassifier(random_state=0, n_estimators=100, max_depth=50, min_samples_split=50, min_samples_leaf=50, max_leaf_nodes=50)
+		self.classifier = RandomForestClassifier(random_state=0, n_estimators=110, max_depth=20, min_samples_split=50, min_samples_leaf=30, max_leaf_nodes=60)
 
 	def train(self, train_csv):
 		# Load dataset
@@ -72,52 +72,91 @@ class Model:
 		# Use the random grid to search for best hyperparameters
 		rf_random = GridSearchCV(self.classifier, grid, cv=3, verbose=2, n_jobs=-1)
 		rf_random.fit(X_train, y_train)
-		return rf_random.best_params_ # last result: {'max_depth': 40, 'max_leaf_nodes': 70, 'min_samples_leaf': 10, 'min_samples_split': 40, 'n_estimators': 70}
+		return rf_random.best_params_
 
-	def graph_hyperparameter_tuning(self, train_csv, validation_csv):
-		# Load dataset
+	def get_hyperparameter_tuning_scores(self, train_csv, validation_csv, range_offset: int, step: int):
+		""" Performs testing of different values for each parameter of the classifier 
+
+		Args:
+			train_csv (str): path to train csv file
+			validation_csv (str): path to validation csv file
+			variance (int): difference from default parameter value to min and max values
+			step (int): difference between each test value
+
+		Returns:
+			tuple[list, list, list]: a list of axes used for each parameter, a list of train scores and a list of validation scores for the parameters
+			"n_estimators", "max_depth", "min_samples_split", "min_samples_leaf", "max_leaf_nodes"
+		"""
+
+		# Get train values
 		df_train = pd.read_csv(train_csv)
-		df_validation = pd.read_csv(validation_csv)
-
-		# Get X and y
 		X_train = self.extract_features(df_train[self.X_column], True)
 		y_train = df_train[self.y_column]
 		del df_train
-		X_test = self.extract_features(df_validation[self.X_column])
+
+		# Get validation values
+		df_validation = pd.read_csv(validation_csv)
+		X_validation = self.extract_features(df_validation[self.X_column])
 		y_validation = df_validation[self.y_column]
 		del df_validation
-
-		original_classifier = self.classifier
-
-		values = list(range(10,201,10))
-		# values = list(range(2,21,2))
-		# values = [x*0.01 for x in range(10,101,10)]
+		
+		parameters = ("n_estimators", "max_depth", "min_samples_split", "min_samples_leaf", "max_leaf_nodes")
+		x_axes = list()
 		train_scores = list()
-		test_scores = list()
-		values_length = len(values)
+		validation_scores = list()
 
-		for i in range(values_length):
-			print(f"Testing {i+1}/{values_length} parameter setting..")
-			value = values[i]
-			new_classifier = original_classifier
-			new_classifier.n_estimators = value
-			new_classifier.fit(X_train, y_train)
-			y_train_predict = new_classifier.predict(X_train)
-			train_scores.append(f1_score(y_train, y_train_predict, average="macro"))
-			del y_train_predict
-			y_test_predict = new_classifier.predict(X_test)
-			test_scores.append(f1_score(y_validation, y_test_predict, average="macro"))
-			del y_test_predict
-			del new_classifier
+		for i in range(len(parameters)):
+			parameter = parameters[i]
+			train_scores.append(list())
+			validation_scores.append(list())
 
-		# Graph results
-		plt.plot(values, train_scores, ".-", label="Train")
-		plt.plot(values, test_scores, ".-", label="Test")
-		plt.xlabel("Hyperparameter Value")
-		plt.ylabel("F1 Score")
-		plt.legend()
-		plt.grid()
-		plt.show()
+			# Generate appropriate test values
+			values = list()
+			match parameter:
+				case "n_estimators":
+					values = range(self.classifier.n_estimators - range_offset, self.classifier.n_estimators + range_offset + 1, step)
+				case "max_depth":
+					values = range(self.classifier.max_depth - range_offset, self.classifier.max_depth + range_offset + 1, step)
+				case "min_samples_split":
+					values = range(self.classifier.min_samples_split - range_offset, self.classifier.min_samples_split + range_offset + 1, step)
+				case "min_samples_leaf":
+					values = range(self.classifier.min_samples_leaf - range_offset, self.classifier.min_samples_leaf + range_offset + 1, step)
+				case "max_leaf_nodes":
+					values = range(self.classifier.max_leaf_nodes - range_offset, self.classifier.max_leaf_nodes + range_offset + 1, step)
+				case _:
+					print("Invalid parameter!")
+					return train_scores, validation_scores
+			values_length = len(values)
+			x_axes.append(list(values))
+
+			# Try each parameter value
+			for j in range(values_length):
+
+				# Adjust appropriate parameter
+				new_classifier = clone(self.classifier)
+				match parameter:
+					case "n_estimators":
+						new_classifier.n_estimators = values[j]
+					case "max_depth":
+						new_classifier.max_depth = values[j]
+					case "min_samples_split":
+						new_classifier.min_samples_split = values[j]
+					case "min_samples_leaf":
+						new_classifier.min_samples_leaf = values[j]
+					case "max_leaf_nodes":
+						new_classifier.max_leaf_nodes = values[j]
+				
+				# Test new classifier performance using the parameter value
+				print(f"\rTesting {parameter}: {j+1}/{values_length}\t", end="")
+				new_classifier.fit(X_train, y_train)
+				y_train_predict = new_classifier.predict(X_train)
+				train_scores[i].append(f1_score(y_train, y_train_predict, average="macro"))
+				del y_train_predict
+				y_validation_predict = new_classifier.predict(X_validation)
+				validation_scores[i].append(f1_score(y_validation, y_validation_predict, average="macro"))
+				del y_validation_predict
+			print()
+		return x_axes, train_scores, validation_scores
 
 	# region Feature extraction methods
 
