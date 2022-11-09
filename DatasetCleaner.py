@@ -5,18 +5,12 @@ import numpy as np
 
 import nltk
 from nltk.corpus import stopwords
-import nltk.tokenize
-from nltk.corpus import wordnet
-
 from nltk import tokenize
 
 class DatasetCleaner():
 	# Download nltk dependencies
 	nltk.download('stopwords')
-	nltk.download('wordnet')
-	nltk.download('omw-1.4')
 	nltk.download('punkt')
-	nltk.download('averaged_perceptron_tagger')
 	SENTENCE_SEPARATOR = '|'
 
 	# Define stopwords
